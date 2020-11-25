@@ -1,0 +1,405 @@
+#INCLUDE 'PROTHEUS.CH'
+#INCLUDE 'RWMAKE.CH'
+#INCLUDE 'FONT.CH'
+#INCLUDE 'COLORS.CH'
+
+#DEFINE ENTER CHR(13)+CHR(10)
+
+/*/{Protheus.doc} User Function TelaCAtivo
+    Tela para fazer alteração do centro de custo dos ativos fixos (SN3) com a opção de 
+    alterar também o movimento de depreciação na tabela SN4
+    @type  Function
+    @author Flavio Dias
+    @since 20/11/2020
+    @version 1.0
+    @obs RISA SA
+    /*/
+User Function TelaCAtivo()
+
+Private aArea := GetArea()
+    //Fontes
+    Private cFontUti    := "Tahoma"
+    Private oFontAno    := TFont():New(cFontUti,,-38)
+    Private oFontSub    := TFont():New(cFontUti,,-20)
+    Private oFontSubN   := TFont():New(cFontUti,,-20,,.T.)
+    Private oFontBtn    := TFont():New(cFontUti,,-14)
+    
+    //Tamanho da janela
+    Private    aTamanho := MsAdvSize()
+    Private    nJanLarg := aTamanho[5]
+    Private    nJanAltu := aTamanho[6]
+    
+      //Janela e componentes
+    Private oDlgGrp
+    Private oPanGrid
+    Private oGetGrid
+    Private aColunas := {}
+    Private cAliasTab := "TMPSBM"
+    Private oTempTable
+
+    // variáveis da tela de filtro 
+    Private nGet1 :=Space(9)
+    Private nGet2 := 'ZZZZZZZZZ'
+    Private nGet3 := Space(10)
+    Private nGet4 := Space(4)
+    Private nGet5 := 'ZZZZZZZZZZ'
+    Private nGet6 := 'ZZZZ'
+    Private nGet7 := Space(4)
+    Private nGet8 := 'ZZZZ'
+    Private aItems:= {'Sim','Não'}
+    Private nCBox1
+
+    VParame()
+   
+    
+Return
+ 
+
+/*/{Protheus.doc} MontaGrid
+    Monsta a grid na tela
+    @type  Static Function
+    @author Flavio Dias
+    @since 23/11/2020
+     /*/
+Static Function MontaGrid()
+  
+    
+    //Criando a janela
+    DEFINE MSDIALOG oDlgGrp TITLE "Alteração de Centro de Custo" FROM 000, 000  TO nJanAltu, nJanLarg COLORS 0, 16777215 PIXEL
+        //Labels gerais
+        @ 004, 003 SAY "ATF"                      SIZE 200, 030 FONT oFontAno  OF oDlgGrp COLORS RGB(149,179,215) PIXEL
+        @ 004, 050 SAY "Listagem de"              SIZE 200, 030 FONT oFontSub  OF oDlgGrp COLORS RGB(031,073,125) PIXEL
+        @ 014, 050 SAY "Ativo Fixo"       SIZE 200, 030 FONT oFontSubN OF oDlgGrp COLORS RGB(031,073,125) PIXEL
+ 
+        //Botões
+        @ 006, (nJanLarg/2-001)-(0052*01) BUTTON oBtnFech  PROMPT "Fechar"        SIZE 050, 018 OF oDlgGrp ACTION (oDlgGrp:End())   FONT oFontBtn PIXEL
+       // @ 006, (nJanLarg/2-001)-(0052*02) BUTTON oBtnLege  PROMPT "Filtro"     SIZE 050, 018 OF oDlgGrp ACTION (VParame()) PIXEL FONT oFontBtn PIXEL
+        @ 006, (nJanLarg/2-001)-(0052*04) BUTTON oBtnFech  PROMPT "Alterar Centro de Custo"   SIZE 080, 018 OF oDlgGrp ACTION (AltCust())   FONT oFontBtn PIXEL
+ 
+        //Dados
+        @ 024, 003 GROUP oGrpDad TO (nJanAltu/2-003), (nJanLarg/2-003) PROMPT "Ativos (Rotina para fazer alteração de Centro de Custo): " OF oDlgGrp COLOR 0, 16777215 PIXEL
+        oGrpDad:oFont := oFontBtn
+            oPanGrid := tPanel():New(033, 006, "", oDlgGrp, , , , RGB(000,000,000), RGB(254,254,254), (nJanLarg/2 - 13),     (nJanAltu/2 - 45))
+            oGetGrid := FWBrowse():New()
+            oGetGrid:DisableFilter()
+            oGetGrid:DisableConfig()
+            oGetGrid:DisableReport()
+            oGetGrid:DisableSeek()
+            oGetGrid:DisableSaveConfig()
+            oGetGrid:SetFontBrowse(oFontBtn)
+            oGetGrid:SetAlias(cAliasTab)
+            oGetGrid:SetDataTable()
+            oGetGrid:SetInsert(.F.)
+            oGetGrid:SetDelete(.F., { || .F. })
+            oGetGrid:lHeaderClick := .F.
+            oGetGrid:SetColumns(aColunas)
+            oGetGrid:SetOwner(oPanGrid)
+            oGetGrid:Activate()
+    ACTIVATE MsDialog oDlgGrp CENTERED
+ 
+    //Deleta a temporaria
+    oTempTable:Delete()
+ 
+    RestArea(aArea)
+
+Return 
+
+/*/{Protheus.doc} MontaTemp
+    Criar a tabela temporário com o filtro infromado
+    @type  Static Function
+    @author Flavio Dias
+    @since 23/11/2020
+    @version 1.0.0
+    /*/
+Static Function MontaTemp()
+
+//Cria a temporária
+    oTempTable := FWTemporaryTable():New(cAliasTab)
+     
+    //Adiciona no array das colunas as que serão incluidas (Nome do Campo, Tipo do Campo, Tamanho, Decimais)
+    aFields := {}
+    aAdd(aFields, {"N1_FILIAL", "C", TamSX3('N1_FILIAL')[01],   0})
+    aAdd(aFields, {"N1_GRUPO", "C", TamSX3('N1_GRUPO')[01],    0})
+    aAdd(aFields, {"N1_CBASE", "C", TamSX3('N1_CBASE')[01],  0})
+    aAdd(aFields, {"N1_ITEM", "C", TamSX3('N1_ITEM')[01],  0})
+    aAdd(aFields, {"N1_DESCRIC", "C", TamSX3('N1_DESCRIC')[01],  0})
+    aAdd(aFields, {"N1_AQUISIC", "D", TamSX3('N1_AQUISIC')[01],  0})
+    aAdd(aFields, {"N3_CUSTBEM", "C", TamSX3('N3_CUSTBEM')[01],  0})
+    aAdd(aFields, {"N3_TIPO", "C", TamSX3('N3_TIPO')[01],  0})
+    aAdd(aFields, {"N1_BAIXA", "D", TamSX3('N1_BAIXA')[01],  0})
+    
+     
+    //Define as colunas usadas, adiciona indice e cria a temporaria no banco
+    oTempTable:SetFields( aFields )
+    oTempTable:AddIndex("1", {"N1_CBASE"} )
+    oTempTable:Create()
+
+
+Return 
+
+
+Static Function fMontaHead()
+    Local nAtual
+    Local aHeadAux := {}
+ 
+    //Adicionando colunas
+    //[1] - Campo da Temporaria
+    //[2] - Titulo
+    //[3] - Tipo
+    //[4] - Tamanho
+    //[5] - Decimais
+    //[6] - Máscara
+    aAdd(aHeadAux, {"N1_FILIAL", "Filial",          "C", TamSX3('N1_FILIAL')[01],   0, ""})
+    aAdd(aHeadAux, {"N1_GRUPO", "Grupo",        "C", TamSX3('N1_GRUPO')[01],    0, ""})
+    aAdd(aHeadAux, {"N1_CBASE", "CBase",     "C", TamSX3('N1_CBASE')[01],  0, ""})
+    aAdd(aHeadAux, {"N1_ITEM", "Item",        "C", TamSX3('N1_ITEM')[01],  0, ""})
+    aAdd(aHeadAux, {"N1_DESCRIC", "Descrição",     "C", TamSX3('N1_DESCRIC')[01],  0, ""})
+    aAdd(aHeadAux, {"N1_AQUISIC", "Data Aquisição",     "D", TamSX3('N1_AQUISIC')[01],  0, ""})
+    aAdd(aHeadAux, {"N3_CUSTBEM", "Centro de Custo",     "C", TamSX3('N3_CUSTBEM')[01],  0, ""})
+    aAdd(aHeadAux, {"N3_TIPO", "Tipo",     "C", TamSX3('N3_TIPO')[01],  0, ""})
+    aAdd(aHeadAux, {"N1_BAIXA", "Data Baixa",     "D", TamSX3('N1_BAIXA')[01],  0, ""})
+ 
+    //Percorrendo e criando as colunas
+    For nAtual := 1 To Len(aHeadAux)
+        oColumn := FWBrwColumn():New()
+        oColumn:SetData(&("{|| " + cAliasTab + "->" + aHeadAux[nAtual][1] +"}"))
+        oColumn:SetTitle(aHeadAux[nAtual][2])
+        oColumn:SetType(aHeadAux[nAtual][3])
+        oColumn:SetSize(aHeadAux[nAtual][4])
+        oColumn:SetDecimal(aHeadAux[nAtual][5])
+        oColumn:SetPicture(aHeadAux[nAtual][6])
+        aAdd(aColunas, oColumn)
+    Next
+Return
+ 
+Static Function fMontDados(oSay)
+    Local aArea := GetArea()
+    Local cQry  := ""
+    Local nAtual := 0
+    Local nTotal := 0
+ 
+    //Zera a grid
+    aColsGrid := {}
+
+    
+
+    //Montando a query
+    oSay:SetText("Montando a consulta")
+    cQry := "SELECT N1_FILIAL, N1_GRUPO, N1_CBASE, N1_ITEM, N1_AQUISIC, N1_DESCRIC, N3_CUSTBEM, N3_TIPO, N1_BAIXA FROM SN1110 "
+    cQry +=  " inner JOIN SN3110 on N3_FILIAL = N1_FILIAL AND N3_CBASE = N1_CBASE AND "
+    cQry += " N3_ITEM = N1_ITEM AND SN3110.D_E_L_E_T_<>'*' WHERE SN1110.D_E_L_E_T_<>'*' and "
+    cQry += " N3_CUSTBEM='"+nGet1+"' AND N1_CBASE>='"+nGet3+"' and N1_CBASE<='"+nGet5+"' and N1_ITEM>='"+nGet4+"' "
+    cQry += " and N1_ITEM<='"+nGet6+"' and N1_GRUPO>='"+nGet7+"' and N1_GRUPO<='"+nGet8+"' "
+    cQry += " ORDER BY N1_CBASE, N1_ITEM, N3_TIPO "
+    
+    //Executando a query
+    oSay:SetText("Executando a consulta")
+    PLSQuery(cQry, "QRY_SBM")
+ 
+    //Se houve dados
+    If ! QRY_SBM->(EoF())
+        //Pegando o total de registros
+        DbSelectArea("QRY_SBM")
+        Count To nTotal
+        QRY_SBM->(DbGoTop())
+ 
+        //Enquanto houver dados
+        While ! QRY_SBM->(EoF())
+ 
+            //Muda a mensagem na regua
+            nAtual++
+            oSay:SetText("Adicionando registro " + cValToChar(nAtual) + " de " + cValToChar(nTotal) + "...")
+ 
+            RecLock(cAliasTab, .T.)
+                (cAliasTab)->N1_FILIAL := QRY_SBM->N1_FILIAL
+                (cAliasTab)->N1_GRUPO := QRY_SBM->N1_GRUPO
+                (cAliasTab)->N1_CBASE := QRY_SBM->N1_CBASE
+                (cAliasTab)->N1_ITEM := QRY_SBM->N1_ITEM
+                (cAliasTab)->N1_DESCRIC := QRY_SBM->N1_DESCRIC
+                (cAliasTab)->N1_AQUISIC := QRY_SBM->N1_AQUISIC
+                (cAliasTab)->N3_CUSTBEM := QRY_SBM->N3_CUSTBEM
+                (cAliasTab)->N3_TIPO := QRY_SBM->N3_TIPO
+                (cAliasTab)->N1_BAIXA := QRY_SBM->N1_BAIXA
+            (cAliasTab)->(MsUnlock())
+ 
+            QRY_SBM->(DbSkip())
+        EndDo
+ 
+    Else
+        MsgStop("Nao foi encontrado registros!", "Atencao")
+ 
+        RecLock(cAliasTab, .T.)
+            (cAliasTab)->N1_FILIAL := ""
+            (cAliasTab)->N1_GRUPO := ""
+            (cAliasTab)->N1_CBASE := ""
+            (cAliasTab)->N1_ITEM := ""
+            (cAliasTab)->N1_DESCRIC := ""
+            (cAliasTab)->N1_AQUISIC := dDataBase
+            (cAliasTab)->N3_CUSTBEM := ""
+            (cAliasTab)->N3_TIPO := ""
+            (cAliasTab)->N1_BAIXA := dDataBase
+        (cAliasTab)->(MsUnlock())
+    EndIf
+    
+    QRY_SBM->(DbCloseArea())
+    (cAliasTab)->(DbGoTop())
+ 
+    RestArea(aArea)
+
+    
+Return
+ 
+/*/{Protheus.doc} VParame
+    Tela com as Filtros para aletração do centro de custos
+    @type  Static Function
+    @author Flavio Dias
+    @since 20/11/2020
+    @version 1.0.0
+     /*/
+Static Function VParame()
+
+SetPrvt("oFont1","oFont2","oDlg1","oGrp1","oSay1","oSay2","oSay3","oSay4","oSay5","oSay6","oSay7","oSay8")
+SetPrvt("oGet2","oGet3","oGet4","oGet5","oGet6","oGet7","oGet8","oBtn1") 
+
+oFont1     := TFont():New( "MS Sans Serif",0,-16,,.T.,0,,700,.F.,.F.,,,,,, )
+oFont2     := TFont():New( "MS Sans Serif",0,-13,,.F.,0,,400,.F.,.F.,,,,,, )
+oDlg1      := MSDialog():New( 092,232,564,709,"Filtro de Pesquisa",,,.F.,,,,,,.T.,,,.T. )
+oGrp1      := TGroup():New( 000,004,180,228,"Parametros",oDlg1,CLR_BLACK,CLR_WHITE,.T.,.F. )
+oSay1      := TSay():New( 016,008,{||"C. de Custo Origem:"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,060,008)
+oSay2      := TSay():New( 036,008,{||"C. de Custo Destino:"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,060,008)
+oSay3      := TSay():New( 054,008,{||"Do Código Base?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,060,008)
+oSay4      := TSay():New( 071,032,{||"Do Item?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,036,008)
+oSay5      := TSay():New( 085,007,{||"Até Código Base?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,060,008)
+oSay6      := TSay():New( 105,036,{||"Até Item?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,032,008)
+oSay7      := TSay():New( 122,032,{||"Do Grupo?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,036,009)
+oSay8      := TSay():New( 141,032,{||"Até Grupo?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,035,011)
+oSay9      := TSay():New( 163,008,{||"Alterar Movimentação de Depreciação?"},oGrp1,,oFont2,.F.,.F.,.F.,.T.,CLR_BLACK,CLR_WHITE,124,011)
+oGet1      := TGet():New( 014,070,{ |u| If( PCount() == 0,nGet1,nGet1 := u ) },oGrp1,076,011,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"CTT","",,)
+oGet2      := TGet():New( 032,069,{ |u| If( PCount() == 0,nGet2,nGet2 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"CTT","",,)
+oGet3      := TGet():New( 051,069,{ |u| If( PCount() == 0,nGet3,nGet3 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"SN1","",,)
+oGet4      := TGet():New( 068,069,{ |u| If( PCount() == 0,nGet4,nGet4 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"","",,)
+oGet5      := TGet():New( 084,069,{ |u| If( PCount() == 0,nGet5,nGet5 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"SN1","",,)
+oGet6      := TGet():New( 102,069,{ |u| If( PCount() == 0,nGet6,nGet6 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"","",,)
+oGet7      := TGet():New( 120,069,{ |u| If( PCount() == 0,nGet7,nGet7 := u ) },oGrp1,076,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"SNG","",,)
+oGet8      := TGet():New( 139,069,{ |u| If( PCount() == 0,nGet8,nGet8 := u ) },oDlg1,075,012,'',,CLR_BLACK,CLR_WHITE,oFont1,,,.T.,"",,,.F.,.F.,,.F.,.F.,"SNG","",,)
+oCBox1     := TComboBox():New( 160,132,{|u|if(PCount()>0,nCBox1:=u,nCBox1)},aItems,072,012,oGrp1,,,,CLR_BLACK,CLR_WHITE,.T.,oFont2,"",,,,,,, )
+oBtn1      := TButton():New( 186,172,"Executar",oDlg1,{ || ListaF()},056,020,,oFont1,,.T.,,"",,,,.F. )
+
+oDlg1:Activate(,,,.T.)
+
+
+
+Return 
+
+
+/*/{Protheus.doc} ListaF
+    Lista os ativos fixos de acordo com filtro informado.
+    @type  Static Function
+    @author Flavio Dias
+    @since 23/11/2020
+    @version 1.0.0
+    /*/
+Static Function ListaF()
+
+Local bStatus := .f.
+
+if nGet2!='ZZZZZZZZZ'
+   bStatus :=.t.
+
+ENDIF
+    
+if bStatus
+
+oDlg1:End()
+
+    // cria a tabela temporario 
+    MontaTemp()
+    
+ 
+    //Monta o cabecalho
+   fMontaHead()
+ 
+    //Montando os dados, eles devem ser montados antes de ser criado o FWBrowse
+    FWMsgRun(, {|oSay| fMontDados(oSay) }, "Processando", "Buscando Ativos")
+ 
+    MontaGrid() 
+   EndIf
+
+  if bStatus == .f.
+      ApMsgInfo("Centro de Custo Destino é de preenchimento OBRIGATÍRIO!!!!")
+  EndIf  
+
+Return 
+
+/*/{Protheus.doc} AltCust
+    Alteração do Centro de Custo do Ativo fixo
+    @type  Static Function
+    @author Flavio Dias
+    @since 23/11/2020
+    @version 1.0.0
+    /*/
+Static Function AltCust()
+    Local bExecuta := .f.
+    Local Mensagem :=""
+    Local cQuery := ""
+    Local nRetorno := 0
+     Local nRetorn2 := 0
+
+    Mensagem += "Essa rotina ira fazer a alteração dos CENTRO DE CUSTOS conforme a tela de parametros "+ENTER
+    Mensagem +="Centro de Custo Destino: "+nGet2+ENTER
+    //Mensagem +="Centro de Custo Origem: "+nGet1+ENTER
+    Mensagem +="Altera Movimentação: "+nCBox1+ENTER
+    Mensagem +="Confirma a Execução?"
+
+    bExecuta := ApMsgYesNo(Mensagem,"Aviso") 
+
+    if bExecuta
+    // rotinas de atulização das tabelas 
+    cQuery +="UPDATE "+RetsqlName("SN3") +" SET N3_CUSTBEM='"+nGet2+"' WHERE "+ENTER
+    cQuery += " D_E_L_E_T_<>'*' AND N3_FILIAL+N3_CBASE+N3_ITEM in (SELECT DISTINCT N1_FILIAL+N1_CBASE+N1_ITEM  FROM"+ENTER
+    cQuery += RetsqlName("SN1")+" inner JOIN "+ RetsqlName("SN3") +" on N3_FILIAL = N1_FILIAL AND N3_CBASE = N1_CBASE AND "
+    cQuery += " N3_ITEM = N1_ITEM AND SN3110.D_E_L_E_T_<>'*' WHERE SN1110.D_E_L_E_T_<>'*' and "
+    cQuery += " N3_CUSTBEM='"+nGet1+"' and N1_CBASE>='"+nGet3+"' and N1_CBASE<='"+nGet5+"' and N1_ITEM>='"+nGet4+"' "
+    cQuery += " and N1_ITEM<='"+nGet6+"' and N1_GRUPO>='"+nGet7+"' and N1_GRUPO<='"+nGet8+"' )"
+    
+
+ 
+     nRetorno :=TCSqlExec(cQuery)
+     
+     if (nRetorno < 0)
+        ApMsgAlert("Erro: " + TCSQLError(),"Aviso de Erro")
+        
+     endif
+
+     if (nRetorno >= 0)
+
+             if nCBox1 =='Sim'
+                cQuery := ""
+                cQuery +="UPDATE "+RetsqlName("SN4") +" SET N4_CCUSTO='"+nGet2+"' WHERE "+ENTER
+                cQuery += " D_E_L_E_T_<>'*' AND N4_FILIAL+N4_CBASE+N4_ITEM in (SELECT DISTINCT N1_FILIAL+N1_CBASE+N1_ITEM  FROM"+ENTER
+                cQuery += RetsqlName("SN1")+" inner JOIN "+ RetsqlName("SN3") +" on N3_FILIAL = N1_FILIAL AND N3_CBASE = N1_CBASE AND "
+                cQuery += " N3_ITEM = N1_ITEM AND SN3110.D_E_L_E_T_<>'*' WHERE SN1110.D_E_L_E_T_<>'*' and "
+                cQuery += " N3_CUSTBEM='"+nGet1+"' and N1_CBASE>='"+nGet3+"' and N1_CBASE<='"+nGet5+"' and N1_ITEM>='"+nGet4+"' "
+                cQuery += " and N1_ITEM<='"+nGet6+"' and N1_GRUPO>='"+nGet7+"' and N1_GRUPO<='"+nGet8+"' )"
+            
+                nRetorn2 :=TCSqlExec(cQuery)
+                     if (nRetorn2 < 0)
+                        ApMsgAlert("Erro: " + TCSQLError(),"Aviso de Erro")
+                    endif
+
+                    if (nRetorn2 >= 0)
+                         ApMsgInfo("Operação realizado con sucesso!!!","Sucesso")
+                         oDlgGrp:End()
+                    endif
+             endif
+
+         if nCBox1 !='Sim'
+            ApMsgInfo("Operação realizado con sucesso!!!","Sucesso")
+            oDlgGrp:End()
+        endif
+       
+     endif
+
+    EndIf
+Return 
+ 

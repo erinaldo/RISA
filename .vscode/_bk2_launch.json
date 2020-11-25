@@ -4,10 +4,11 @@
 		{
 			"type": "totvs_language_debug",
 			"request": "launch",
-			"name": "Depuração do idioma TOTVS",
+			"name": "TOTVS Language Debug",
 			"program": "${command:AskForProgramName}",
+			"server": "187.94.62.4",
 			"cwb": "${workspaceFolder}",
-			"smartclientBin": "C:/Users/emerson.natali/desktop/RISA_SMARTCLIENT/smartclient.exe",
+			"smartclientBin": "C:/Users/emerson.natali/Desktop/RISA_SMARTCLIENT/smartclient.exe",
 			"isMultiSession": true,
 			"enableTableSync": true
 		}
@@ -16,6 +17,21 @@
 		{
 			"args": [],
 			"label": "SIGAMDI",
+			"description": ""
+		},
+		{
+			"args": [],
+			"label": "u_UPDFSW",
+			"description": ""
+		},
+		{
+			"args": [],
+			"label": "SIGA",
+			"description": ""
+		},
+		{
+			"args": [],
+			"label": "SIGACFG",
 			"description": ""
 		}
 	],

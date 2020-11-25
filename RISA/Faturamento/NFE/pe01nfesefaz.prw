@@ -157,6 +157,11 @@ If aNota[4] == "1"	// Notas de Saida
 				cMensCli += cObsMNF
 			Endif
 		Endif
+	Else
+		//incluído por Alex Rodrigues - 20/11/2020
+		For I:= 1 to Len(aProd)
+			aProd[i][ 4] := aProd[i][4] + POSICIONE("SB5",1,XFILIAL("SB5")+SC6->C6_PRODUTO,"B5_CEME")
+		Next
 	Endif
 // Dados da Venda Balcao
 	If SF2->F2_PREFORI == "BAL"

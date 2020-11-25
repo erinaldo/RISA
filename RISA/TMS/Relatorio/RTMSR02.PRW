@@ -5,6 +5,8 @@
 #INCLUDE "TOTVS.CH"
 #INCLUDE "FONT.CH"
 #INCLUDE "FWPrintSetup.ch"
+
+
 #DEFINE CRLF Chr(13)+Chr(10)
 
 /*
@@ -39,7 +41,7 @@ User Function RTMSR02()
 	Local _aAreaDT5  := DT5->(GetArea()) //Coleta
 	Local _aAreaDUM  := DUM->(GetArea()) //Itens da Coleta
 	Local _aAreaDUD  := DUD->(GetArea()) //Movimento de Viagem
-
+	
 	Local lOk		 := .F.
 	Local lRet	     := .F.
 	Local cPerg      := "RTMR02" //"R943C001"
@@ -117,7 +119,7 @@ Static Function R4305QRY()
 	cQuery += " DUE.DUE_NOME, DUE.DUE_END, DUE.DUE_BAIRRO, DUE.DUE_MUN, DUE.DUE_EST, DUE.DUE_CEP, DUE.DUE_CGC, DUE.DUE_INSCR,  " + CRLF
 	cQuery += " DUE.DUE_CONTAT, DUE.DUE_PONREF, DUE.DUE_CDRSOL, DUE.DUE_CODCLI, DUE.DUE_LOJCLI, " + CRLF
 	cQuery += " DTR.DTR_FILORI, DTR.DTR_VIAGEM, DTR.DTR_CODVEI, DTR.DTR_CODRB1, DTR.DTR_CODRB2, DTR.DTR_CODRB3, " + CRLF
-	cQuery += " DA4.DA4_NOME, DA4.DA4_RG, SC5.C5_FILIAL, SC5.C5_NUM, DF1.DF1_XCODRE " + CRLF
+	cQuery += " DA4.DA4_NOME, DA4.DA4_RG, SC5.C5_FILIAL, SC5.C5_NUM, DF1.DF1_XCODRE, DF1.DF1_XCDVEI,DF1.DF1_XRBQ1, DF1.DF1_XRBQ2,DF1.DF1_XRBQ3, DF1.DF1_XCDMOT" + CRLF
 	cQuery += "	FROM "
 	cQuery += 		RetSqlName("DT5") + " DT5 " +CRLF
 	cQuery += " INNER JOIN " + RetSqlName("DUE") + " DUE ON DUE.DUE_FILIAL = '"+xFilial("DUE")+"'  AND DUE.DUE_CODSOL = DT5.DT5_CODSOL " +CRLF
@@ -134,7 +136,7 @@ Static Function R4305QRY()
 	cQuery += "                 AND DA4.D_E_L_E_T_ = '' " +CRLF
 	cQuery += " LEFT OUTER JOIN "+RetSqlName("DF1")+" DF1 ON DF1.DF1_FILIAL = '" + xFilial("DF1") + "' AND  DF1.DF1_FILDOC = DT5.DT5_FILDOC " +CRLF
 	cQuery += "                 AND  DF1.DF1_DOC = DT5.DT5_DOC AND  DF1.DF1_SERIE = DT5.DT5_SERIE   AND DF1.D_E_L_E_T_ = '' " +CRLF
-	cQuery += " LEFT OUTER JOIN "+RetSqlName("SC5")+" SC5 ON SC5.C5_FILIAL = '" + xFilial("SC5") + "' AND  SC5.C5_XCODRE = DF1.DF1_XCODRE " +CRLF
+	cQuery += " LEFT OUTER JOIN "+RetSqlName("SC5")+" SC5 ON SC5.C5_XCODRE = DF1.DF1_XCODRE AND DF1.DF1_XCODRE <> '' " +CRLF
 	cQuery += "                 AND SC5.D_E_L_E_T_ = '' " +CRLF
 	cQuery += " WHERE DT5.D_E_L_E_T_ = ''   " +CRLF
 	cQuery += " AND DT5.DT5_FILORI = '"+cFilAnt+"' " +CRLF ////TBETWEEN '"+MV_PAR01+"' AND '"+MV_PAR02+"' " +CRLF
@@ -229,6 +231,7 @@ Static Function R4305IMP()
 		IncProc('COLETA: '+COLQRY->DT5_NUMSOL)
 		
 		R4305CAB()  //Cabeçalho da Coleta
+
 		R4305COL()  //Itens da Coleta
 		
 		DT5->(DbSetOrder(1))
@@ -242,15 +245,15 @@ Static Function R4305IMP()
 		COLQRY->(DbSkip())
 		
 	EndDo
-	
+	//_nomearq	:=	"COLETA-" + ALLTRIM(COLQRY->DT5_NUMSOL)+'_'+_cTime
 	//ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
 	//³Finaliza a Impressão                                                    ³
 	//ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
-	
+
 	If lPreview
 		oFatura:Preview()
 	EndIf
-	
+
 Return()
 
 /*/
@@ -272,7 +275,7 @@ Static Function R4305CAB()
 	Local cStartPath := GetSrvProfString("Startpath","")
 	Local cLogo  	 := cStartPath + "risa.JPG"  //	:= GetSrvProfString("Startpath","") + "FATURA01.JPG"
 	Local cFilMa := cFilAnt //Filial Corrente
-	
+
 	//ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ¿
 	//³Inicializacao do objeto grafico                                         ³
 	//ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ
@@ -284,8 +287,7 @@ Static Function R4305CAB()
 		_cTime := Transform(Time(),"99:99:99")
 		_cTime := StrTran( _cTime , ":","" )
 		
-		oFatura	:= FWMSPrinter():New("COLETA-" + ALLTRIM(COLQRY->DT5_NUMSOL)+'_'+_cTime, IMP_SPOOL)
-		
+		oFatura	:= FWMSPrinter():New("COLETA-" + ALLTRIM(COLQRY->DT5_NUMSOL)+'_'+_cTime, IMP_PDF)
 		oFatura:SetResolution(78) //Tamanho estipulado para a Danfe
 		oFatura:SetPortrait()
 		oFatura:SetPaperSize(9)
@@ -424,7 +426,7 @@ Static Function R4305CAB()
 	
 	oFatura:Say(0780,0030,"Pedido nº",oFont14N)
 	oFatura:Say(0780,0270,":",oFont14N)
-	oFatura:Say(0780,0310,COLQRY->C5_FILIAL + ' ' + COLQRY->C5_NUM ,oFont14)
+	oFatura:Say(0780,0310,COLQRY->C5_FILIAL + ' - ' + COLQRY->C5_NUM ,oFont14)
 
 	oFatura:Say(0780,1205,"Requisição Frete nº",oFont14N)
 	oFatura:Say(0780,1565,":",oFont14N)
@@ -459,11 +461,11 @@ Static Function R4305COL()
 	Local cTel	  := COLQRY->DT5_TEL
 	Local cSeqEnd := COLQRY->DT5_SEQEND
 	Local cFilR9  := ''
-	Local cRegDes    := ''
-	Local cEstDes	 := ''	
-	
+	Local cRegDes := ''
+	Local cEstDes := ''
 	// 2016-10-27 - MH
 	Local cCliDes := ""
+	
 	Local cLojDes := ""	
 	
 	If Select("ITEMQRY") > 0
@@ -517,35 +519,71 @@ Static Function R4305COL()
 	
 	oFatura:Say(nLinha,0030,"Placa",oFont14N)
 	oFatura:Say(nLinha,0160,":",oFont14N)
-	DA3->(dbSetOrder(1))
-	If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODVEI ))
-		oFatura:Say(nLinha,0200, Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
-	EndIf
+	If Empty(COLQRY->DF1_XCDVEI)
+		DA3->(dbSetOrder(1))
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODVEI ))
+			oFatura:Say(nLinha,0200, Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		EndIf
 	
-	oFatura:Say(nLinha,0470,"Reboque 1",oFont14N) //,,RGB(255,255,255))
-	oFatura:Say(nLinha,0700,":",oFont14N)
-	DA3->(dbSetOrder(1))
-	If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB1 ))
-		oFatura:Say(nLinha,0740,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
-	Else
-		oFatura:Say(nLinha,0740,"----------",oFont14)
-	EndIf
-	
-	oFatura:Say(nLinha,1190,"Reboque 2",oFont14N) //,,RGB(255,255,255))
-	oFatura:Say(nLinha,1420,":",oFont14N)
-	If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB2 ))
-		oFatura:Say(nLinha,1460,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
-	Else
-		oFatura:Say(nLinha,1460,"----------",oFont14)
-	EndIf
+		oFatura:Say(nLinha,0470,"Reboque 1",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,0700,":",oFont14N)
+		DA3->(dbSetOrder(1))
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB1 ))
+			oFatura:Say(nLinha,0740,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,0740,"----------",oFont14)
+		EndIf
+		
+		oFatura:Say(nLinha,1190,"Reboque 2",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,1420,":",oFont14N)
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB2 ))
+			oFatura:Say(nLinha,1460,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,1460,"----------",oFont14)
+		EndIf
 
-	oFatura:Say(nLinha,1850,"Reboque 3",oFont14N) //,,RGB(255,255,255))
-	oFatura:Say(nLinha,2080,":",oFont14N)
-	If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB3 ))
-		oFatura:Say(nLinha,2120,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		oFatura:Say(nLinha,1850,"Reboque 3",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,2080,":",oFont14N)
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DTR_CODRB3 ))
+			oFatura:Say(nLinha,2120,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,2120,"----------",oFont14)
+		EndIf	
+	
 	Else
-		oFatura:Say(nLinha,2120,"----------",oFont14)
-	EndIf	
+
+		DA3->(dbSetOrder(1))
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DF1_XCDVEI ))
+			oFatura:Say(nLinha,0200, Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		EndIf
+	
+		oFatura:Say(nLinha,0470,"Reboque 1",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,0700,":",oFont14N)
+		DA3->(dbSetOrder(1))
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DF1_XRBQ1 ))
+			oFatura:Say(nLinha,0740,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,0740,"----------",oFont14)
+		EndIf
+		
+		oFatura:Say(nLinha,1190,"Reboque 2",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,1420,":",oFont14N)
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DF1_XRBQ2))
+			oFatura:Say(nLinha,1460,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,1460,"----------",oFont14)
+		EndIf
+
+		oFatura:Say(nLinha,1850,"Reboque 3",oFont14N) //,,RGB(255,255,255))
+		oFatura:Say(nLinha,2080,":",oFont14N)
+		If DA3->(MsSeek(xFilial("DA3") + COLQRY->DF1_XRBQ3 ))
+			oFatura:Say(nLinha,2120,Transform(StrTran(DA3->DA3_PLACA,"-",""),"@R AAA-9999"),oFont14)
+		Else
+			oFatura:Say(nLinha,2120,"----------",oFont14)
+		EndIf
+
+	Endif
+
 
 	nLinha += 80
 	
@@ -574,110 +612,96 @@ Static Function R4305COL()
 	cFilVga	:= COLQRY->DTR_FILORI
 	cViagem	:= COLQRY->DTR_VIAGEM
 	
-	DUP->(dbSetOrder(1))
-	If DUP->(MsSeek(xFilial("DUP") + cFilVga + cViagem))
-		
-		nLinha	:= 1130
-		
-		While DUP->(!Eof()) .And. DUP->DUP_FILORI + DUP->DUP_VIAGEM == cFilVga + cViagem
+	If !Empty(cViagem)
+		DUP->(dbSetOrder(1))
+		If DUP->(MsSeek(xFilial("DUP") + cFilVga + cViagem))
 			
-			DA4->(dbSetOrder(1))
-			If DA4->(MsSeek(xFilial("DA4") + DUP->DUP_CODMOT))
-				oFatura:Say(nLinha,0030,"Nome     ",oFont14N)
-				oFatura:Say(nLinha,0160,":",oFont14N)
-				oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_NOME),oFont14)
+			nLinha	:= 1130
+			
+			While DUP->(!Eof()) .And. DUP->DUP_FILORI + DUP->DUP_VIAGEM == cFilVga + cViagem
 				
-				oFatura:Say(nLinha,1025,"CPF ",oFont14N)
-				oFatura:Say(nLinha,1135,":",oFont14N)
-				If !Empty(DA4->DA4_CGC)
-					oFatura:Say(nLinha,1175,Transform(DA4->DA4_CGC,"@r 999.999.999-99"),oFont14)
-				Else
-					oFatura:Say(nLinha,1175,"----------",oFont14)
+				DA4->(dbSetOrder(1))
+				If DA4->(MsSeek(xFilial("DA4") + DUP->DUP_CODMOT))
+					oFatura:Say(nLinha,0030,"Nome     ",oFont14N)
+					oFatura:Say(nLinha,0160,":",oFont14N)
+					oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_NOME),oFont14)
+					
+					oFatura:Say(nLinha,1025,"CPF ",oFont14N)
+					oFatura:Say(nLinha,1135,":",oFont14N)
+					If !Empty(DA4->DA4_CGC)
+						oFatura:Say(nLinha,1175,Transform(DA4->DA4_CGC,"@r 999.999.999-99"),oFont14)
+					Else
+						oFatura:Say(nLinha,1175,"----------",oFont14)
+					EndIf
+					oFatura:Say(nLinha,1795,"CNH ",oFont14N)
+					oFatura:Say(nLinha,1905,":",oFont14N)
+					
+					If !Empty(DA4->DA4_REGCNH)
+						oFatura:Say(nLinha,1945,DA4->DA4_REGCNH,oFont14)
+					Else
+						oFatura:Say(nLinha,1945,"----------",oFont14)
+					EndIf
+
+					nLinha += 60
+					oFatura:Say(nLinha,0030,"RG",oFont14N)
+					oFatura:Say(nLinha,0160,":",oFont14N)
+					oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_RG),oFont14)
+					//--FIM 17-08,VL.				
+					
 				EndIf
-				oFatura:Say(nLinha,1795,"CNH ",oFont14N)
-				oFatura:Say(nLinha,1905,":",oFont14N)
 				
-				If !Empty(DA4->DA4_REGCNH)
-					oFatura:Say(nLinha,1945,DA4->DA4_REGCNH,oFont14)
-				Else
-					oFatura:Say(nLinha,1945,"----------",oFont14)
-				EndIf
-				
-				//--17-08-15,VL.
-				//-- conf. solicit Marcelo, e-mail
-				/*
-				De: Marcelo Abreu [mailto:marcelo.abreu@rapido900.com.br]
-				Enviada em: quarta-feira, 12 de agosto de 2015 18:18
-				Para: 'Vicente Lacerenza' <vicente.lacerenza@rapido900.com.br>
-				Assunto: alterão imprime coleta
-				
-				No relatório A4 (TMSA460 -> AÇÕES RELACIONADAS -> IMPRIMIR)
-				- Imediatamente abaixo de onde imprime o campo nome (‘NOME:’ + DA4_NOME) Imprimir também o campo RG (‘RG:’ + DA4_RG)
-				
-				- Alterar texto onde está escrito ORDEM DE COLETA para ORDEM DE CARREGAMENTO
-				*/
 				nLinha += 60
-				oFatura:Say(nLinha,0030,"RG",oFont14N)
-				oFatura:Say(nLinha,0160,":",oFont14N)
-				oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_RG),oFont14)
-				//--FIM 17-08,VL.				
 				
-			EndIf
-			
-			nLinha += 60
-			
-			DUP->(dbSelectArea("DUP"))
-			DUP->(dbSkip())
-		EndDo
-	EndIf
-	
-	/*oFatura :Fillrect( {1240,0020,1310,2410}, oBrush1, "-2")
-	oFatura:Say(1290,1025,"A J U D A N T E S",oFont18N,,RGB(255,255,255))
-	
-	nLinha	:= 1370
-	
-	DUQ->(dbSetOrder(1))
-	If DUQ->(MsSeek(xFilial("DUQ") + cFilVga + cViagem))
-		
-		While DUQ->(!Eof()) .And. DUQ->DUQ_FILORI + DUQ->DUQ_VIAGEM == cFilVga + cViagem
-			
-			DAU->(dbSetOrder(1))
-			If DAU->(MsSeek(xFilial("DAU") + DUQ->DUQ_CODAJU))
-				oFatura:Say(nLinha,0030,"Nome     ",oFont14N)
-				oFatura:Say(nLinha,0160,":",oFont14N)
-				oFatura:Say(nLinha,0200,DAU->DAU_NOME,oFont14)
-				
-				oFatura:Say(nLinha,1025,"CPF ",oFont14N)
-				oFatura:Say(nLinha,1135,":",oFont14N)
-				oFatura:Say(nLinha,1175,Transform(DAU->DAU_CGC,"@r 999.999.999-99"),oFont14)
-			EndIf
-			
-			nLinha += 60
-			
-			DUQ->(dbSelectArea("DUQ"))
-			DUQ->(dbSkip())
-		EndDo
+				DUP->(dbSelectArea("DUP"))
+				DUP->(dbSkip())
+			EndDo
+		EndIf
 	Else
-		oFatura:Say(nLinha,0030,"Nome     ",oFont14N)
-		oFatura:Say(nLinha,0160,":",oFont14N)
-		oFatura:Say(nLinha,0200,"----------",oFont14)
-		oFatura:Say(nLinha,1025,"CPF ",oFont14N)
-		oFatura:Say(nLinha,1135,":",oFont14N)
-		oFatura:Say(nLinha,1175,"----------",oFont14)
-	EndIf
-	*/
+		nLinha	:= 1130
+		DA4->(dbSetOrder(1))
+		If DA4->(MsSeek(xFilial("DA4") + DF1->DF1_XCDMOT))
+			oFatura:Say(nLinha,0030,"Nome     ",oFont14N)
+			oFatura:Say(nLinha,0160,":",oFont14N)
+			oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_NOME),oFont14)
+			oFatura:Say(nLinha,1025,"CPF ",oFont14N)
+			oFatura:Say(nLinha,1135,":",oFont14N)
+			If !Empty(DA4->DA4_CGC)
+				oFatura:Say(nLinha,1175,Transform(DA4->DA4_CGC,"@r 999.999.999-99"),oFont14)
+			Else
+				oFatura:Say(nLinha,1175,"----------",oFont14)
+			EndIf
+			oFatura:Say(nLinha,1795,"CNH ",oFont14N)
+			oFatura:Say(nLinha,1905,":",oFont14N)
+			If !Empty(DA4->DA4_REGCNH)
+				oFatura:Say(nLinha,1945,DA4->DA4_REGCNH,oFont14)
+			Else
+				oFatura:Say(nLinha,1945,"----------",oFont14)
+			EndIf			
+			
+			nLinha += 60
+			oFatura:Say(nLinha,0030,"RG",oFont14N)
+			oFatura:Say(nLinha,0160,":",oFont14N)
+			oFatura:Say(nLinha,0200,Alltrim(DA4->DA4_RG),oFont14)
+			//--FIM 17-08,VL.				
+		
+		EndIf
+				
+		nLinha += 60
+
+	Endif
+	
 	nLinha := 1490  // 1540
 	
 	oFatura :Fillrect( {nLinha,0020,nLinha+70,2410}, oBrush1, "-2")
 	oFatura:Say(nLinha+50,1035,"D E T A L H E S",oFont18N,,RGB(255,255,255)) ///,,RGB(255,255,255))
 	
 	oFatura :Fillrect({nLinha+80,0020,nLinha+150,2410}, oBrush1,"-2")
-	oFatura:Say(nLinha+125,0030,"EMBARQUE",oFont10A,,RGB(255,255,255))
-	oFatura:Say(nLinha+125,0400,"DESTINO",oFont10A,,RGB(255,255,255))
-	oFatura:Say(nLinha+125,0850,"PRODUTO",oFont10A,,RGB(255,255,255))
-	oFatura:Say(nLinha+125,1270,"EMB.",oFont10A,,RGB(255,255,255))
-	oFatura:Say(nLinha+125,1380,"VOLUME",oFont10A,,RGB(255,255,255))
-	oFatura:Say(nLinha+125,1560,"PESO",oFont10A,,RGB(255,255,255))
+	//oFatura:Say(nLinha+125,0030,"EMBARQUE",oFont10A,,RGB(255,255,255))
+	oFatura:Say(nLinha+125,0030,"DESTINO",oFont10A,,RGB(255,255,255))
+	oFatura:Say(nLinha+125,0300,"PRODUTO",oFont10A,,RGB(255,255,255))
+	oFatura:Say(nLinha+125,1100,"EMB.",oFont10A,,RGB(255,255,255))
+	oFatura:Say(nLinha+125,1200,"VOLUME",oFont10A,,RGB(255,255,255))
+	oFatura:Say(nLinha+125,1460,"PESO",oFont10A,,RGB(255,255,255))
 	oFatura:Say(nLinha+125,1815,"PESO M3",oFont10A,,RGB(255,255,255))
 	oFatura:Say(nLinha+125,2070,"VALOR",oFont10A,,RGB(255,255,255))
 	
@@ -697,11 +721,11 @@ Static Function R4305COL()
 		
 		IncProc('Embarque da Coleta: ' + ITEMQRY->DC)
 		
-		If !Empty(ITEMQRY->DC)
+		/*If !Empty(ITEMQRY->DC)
 			oFatura:Say(nLinha,0030,ITEMQRY->DC,oFont12N)
 		Else
 			oFatura:Say(nLinha,0030,"----------",oFont12N)
-		EndIf
+		EndIf*/
 		
 		If !Empty(ITEMQRY->CDRDES)
 			cCdrDes := ITEMQRY->CDRDES
@@ -723,11 +747,11 @@ Static Function R4305COL()
 			cEstDes	:= DUY->DUY_EST
 		EndIf
 		
-		oFatura:Say(nLinha,0400, Alltrim(Substr(cRegDes,01,15)) + "-" + Alltrim(DUY->DUY_EST),oFont12N)
-		oFatura:Say(nLinha,0850, ITEMQRY->DESCRICAO,oFont12N)
-		oFatura:Say(nLinha,1270, ITEMQRY->CODEMB,oFont12N)
-		oFatura:Say(nLinha,1380, Alltrim(Transform(ITEMQRY->QTDVOL,"@E 99999")), oFont12N)
-		oFatura:Say(nLinha,1560, Alltrim(Transform(ITEMQRY->PESO  ,"@E 999,999.9999")), oFont12N)  //999999,9999
+		oFatura:Say(nLinha,0030, Alltrim(Substr(cRegDes,01,15)) + "-" + Alltrim(DUY->DUY_EST),oFont12N)
+		oFatura:Say(nLinha,0300, left(ITEMQRY->DESCRICAO,40),oFont12N)
+		oFatura:Say(nLinha,1100, ITEMQRY->CODEMB,oFont12N)
+		oFatura:Say(nLinha,1200, Alltrim(Transform(ITEMQRY->QTDVOL,"@E 99999")), oFont12N)
+		oFatura:Say(nLinha,1460, Alltrim(Transform(ITEMQRY->PESO  ,"@E 999,999.9999")), oFont12N)  //999999,9999
 		oFatura:Say(nLinha,1815, Alltrim(Transform(ITEMQRY->PESOM3,"@E 999,999.9999")), oFont12N)
 		oFatura:Say(nLinha,2070, Alltrim(Transform(ITEMQRY->VALMER,"@E 99,999,999,999.99")),oFont12N)
 		
@@ -899,3 +923,4 @@ Static Function AjustaSX1(cPerg)
 		"", "", "", "", "", "", "", "N", "", "", "", "", aHelpPor, aHelpEng, aHelpEsp )
 	
 Return Nil
+

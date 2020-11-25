@@ -1354,14 +1354,20 @@ aFin := condicao(nPreco,M->C5_CONDPAG,0,DDATABASE) // retorno do array {vencimen
 
 IF Len(aFin) == 0 // se array está vazio é porque a condição de pagamento é do tipo específica
 
+    If Empty(M->C5_DATA1)
+        Alert("Condição de pagamento do tipo 9, sem preencher data de vencimento no cabeçalho do pedido. Favor verificar ... ")
+    Endif
+
     //***** Pode ser usado por % ou po 9 - valor ..
 
     cScan := "1"
     nDup:= 0
     While ( !Empty(cScan) )
 
-    	If (FieldPos("C5_DATA"+cScan))>0
-            dUltData := &("M->C5_DATA"+cScan)
+    	If SC5->(FieldPos("C5_DATA"+cScan))>0
+            If !Empty(&("M->C5_DATA"+cScan))
+                dUltData := &("M->C5_DATA"+cScan)
+            Endif
             //Alert("condição de pagamento específica % ou valor -> "+DTOC(&("M->C5_DATA"+cScan)))
         Else
             cScan := ""
@@ -1370,6 +1376,7 @@ IF Len(aFin) == 0 // se array está vazio é porque a condição de pagamento é do t
         cScan := Soma1(cScan,1)
 
     EndDo
+
 Else
         For i:=1 to len(aFin)
             dUltData := aFin[i,1] 
@@ -1384,7 +1391,13 @@ If nPreco > 0
     DbSeek(xFilial("DA1")+M->C5_TABELA+aCols[n,nPosCodPr])
 
     nPrcTab := DA1->DA1_PRCVEN
-
+    
+    If DA1->DA1_MOEDA <> M->C5_MOEDA
+        If DA1->DA1_MOEDA = 2 .and. M->C5_MOEDA = 1
+            nPrcTab := nPrcTab * SM2->M2_MOEDA2
+        EndIf    
+    EndIf
+    
     nJuros := int((dUltData-dDataBase)/30) * nTaxa
     nPrecoJ := nPrcTab + (nPrcTab * nJuros / 100) //aplica acréscimo
     nValDesc := (nPrecoJ*aCols[n,nPosDescP]/100)
